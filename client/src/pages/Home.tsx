@@ -35,7 +35,7 @@ export default function Home() {
           </motion.div>
 
           {/* The Road */}
-          <div className="absolute bottom-18 w-full h-1 bg-primary/10 rounded-full overflow-hidden max-w-xl mx-auto z-10">
+          <div className="absolute bottom-16 w-full h-1 bg-primary/10 rounded-full overflow-hidden max-w-xl mx-auto z-10">
              {/* Moving Road Markers */}
              <motion.div
               className="absolute top-0 left-0 w-full h-full flex space-x-12"
