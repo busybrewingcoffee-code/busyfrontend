@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import truckImage from "@assets/generated_images/Busy2.png";
+import truckImage from "@assets/generated_images/Busy2_optimized.png";
 
 export default function Home() {
   return (
@@ -28,6 +28,9 @@ export default function Home() {
               src={truckImage} 
               alt="Minimalist Coffee Truck" 
               className="w-full h-full object-contain drop-shadow-xl"
+              // @ts-ignore
+              fetchPriority="high"
+              loading="eager"
             />
           </motion.div>
 
