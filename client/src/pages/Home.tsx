@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import truckImage from "@assets/generated_images/isolated_coffee_truck_flat_vector_illustration_with_transparent_background_feel.png";
+import truckImage from "@assets/generated_images/Busy2.png";
 
 export default function Home() {
   return (
@@ -32,7 +32,7 @@ export default function Home() {
           </motion.div>
 
           {/* The Road */}
-          <div className="absolute bottom-10 w-full h-1 bg-border/30 rounded-full overflow-hidden max-w-xl mx-auto z-10">
+          <div className="absolute bottom-18 w-full h-1 bg-primary/10 rounded-full overflow-hidden max-w-xl mx-auto z-10">
              {/* Moving Road Markers */}
              <motion.div
               className="absolute top-0 left-0 w-full h-full flex space-x-12"
@@ -44,14 +44,14 @@ export default function Home() {
               }}
              >
                {[...Array(20)].map((_, i) => (
-                 <div key={i} className="w-8 h-full bg-foreground/20 shrink-0 rounded-full" />
+                 <div key={i} className="w-8 h-full bg-primary/40 shrink-0 rounded-full" />
                ))}
              </motion.div>
           </div>
         </div>
 
         {/* Text Content */}
-        <div className="text-center space-y-6 mt-12">
+        <div className="text-center space-y-6 ">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -59,7 +59,7 @@ export default function Home() {
             className="space-y-2"
           >
             <h1 className="text-5xl md:text-7xl font-serif italic text-primary">
-              The Daily Grind
+              Busy Brewing ...
             </h1>
             <p className="text-xl md:text-2xl font-serif text-foreground/80">
               Chasing the perfect shot.
