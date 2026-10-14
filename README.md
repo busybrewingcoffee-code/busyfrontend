@@ -17,7 +17,7 @@ npm run build
 
 This branch continues the history of `busybrewingcoffee-code/busyfrontend`. The old app and untracked artwork remain untouched in the original BBC checkout. The integrated working directory is `Developer/busy-brewing-integrated`.
 
-`feat/staff-workspace` has Vercel Git deployments disabled in `vercel.json`. No live deployment or project settings were changed. Production remains on `main`. Before a future approved release, configure the two public environment variables in Vercel, verify a preview, then merge/promote. The committed output directory is `dist`; it supersedes the old `dist/public` layout. The `/staff` rewrite supports direct navigation. Unknown paths render a 404 message locally; the host handles other unmatched routes.
+Automatic Vercel Git deployments are disabled in `vercel.json`, including on `main`, until deployment is explicitly approved. No live deployment or project settings were changed. The currently served production deployment remains unchanged. Before a future approved release, configure the two public environment variables in Vercel, verify a preview, then explicitly deploy/promote and re-enable automatic deployments if desired. The committed output directory is `dist`; it supersedes the old `dist/public` layout. The `/staff` rewrite supports direct navigation. Unknown paths render a 404 message locally; the host handles other unmatched routes.
 
 ## Backend
 

@@ -1,6 +1,13 @@
 {
   "framework": "vite",
   "outputDirectory": "dist",
-  "git": { "deploymentEnabled": { "feat/staff-workspace": false } },
-  "rewrites": [{ "source": "/staff/:path*", "destination": "/index.html" }]
+  "git": {
+    "deploymentEnabled": false
+  },
+  "rewrites": [
+    {
+      "source": "/staff/:path*",
+      "destination": "/index.html"
+    }
+  ]
 }
