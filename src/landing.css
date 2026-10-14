@@ -1,0 +1,159 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=DM+Sans:wght@400&display=swap");
+body {
+  margin: 0;
+}
+.landing {
+  min-height: 100svh;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(40 20% 97%);
+  color: hsl(355 45% 30%);
+  padding: 16px;
+  overflow: hidden;
+  position: relative;
+}
+.landing * {
+  box-sizing: border-box;
+}
+.landing main {
+  width: 100%;
+  max-width: 896px;
+  position: relative;
+  z-index: 1;
+}
+.truck-scene {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.truck-scene img {
+  width: 384px;
+  aspect-ratio: 16/9;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 13px rgb(0 0 0 / 0.08));
+  animation: truck 2s ease-in-out infinite;
+  z-index: 2;
+}
+.road {
+  position: absolute;
+  bottom: 64px;
+  width: 100%;
+  max-width: 576px;
+  height: 4px;
+  border-radius: 20px;
+  background: hsl(355 45% 30% / 0.1);
+  overflow: hidden;
+}
+.road > div {
+  display: flex;
+  gap: 48px;
+  height: 100%;
+  animation: road 1.5s linear infinite;
+}
+.road i {
+  width: 32px;
+  flex-shrink: 0;
+  background: hsl(355 45% 30% / 0.4);
+  border-radius: 20px;
+}
+.landing-copy {
+  text-align: center;
+  font-family: "Playfair Display", serif;
+  animation: arrive 0.8s ease-out;
+}
+.landing h1 {
+  font-size: 72px;
+  font-weight: 400;
+  font-style: italic;
+  margin: 0 0 8px;
+  line-height: 1;
+}
+.landing p {
+  font-size: 24px;
+  color: hsl(10 20% 15% / 0.8);
+  margin: 0;
+}
+.coming {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.coming hr {
+  width: 48px;
+  border: 0;
+  border-top: 1px solid hsl(355 45% 30% / 0.3);
+  margin: 0;
+}
+.coming span {
+  font:
+    14px "DM Sans",
+    sans-serif;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: hsl(10 5% 40%);
+}
+.paper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background: url("https://www.transparenttextures.com/patterns/cream-paper.png");
+  mix-blend-mode: multiply;
+}
+@keyframes truck {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  25% {
+    transform: translateY(-2px) rotate(0.5deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(0);
+  }
+  75% {
+    transform: translateY(-2px) rotate(-0.5deg);
+  }
+}
+@keyframes road {
+  from {
+    transform: translateX(-300px);
+  }
+  to {
+    transform: translateX(-100px);
+  }
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 767px) {
+  .truck-scene img {
+    width: 256px;
+  }
+  .landing h1 {
+    font-size: 48px;
+  }
+  .landing p {
+    font-size: 20px;
+  }
+  .coming span {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing * {
+    animation: none !important;
+  }
+}
