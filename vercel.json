@@ -2,7 +2,10 @@
   "framework": "vite",
   "outputDirectory": "dist",
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": {
+      "feat/staff-workspace": false,
+      "main": true
+    }
   },
   "rewrites": [
     {

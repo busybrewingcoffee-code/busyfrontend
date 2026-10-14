@@ -71,10 +71,12 @@ function TicketBody({
   o,
   move,
   handle,
+  cancel,
 }: {
   o: Order;
   move: (id: number, status: Status) => void;
   handle?: React.ReactNode;
+  cancel?: (order: Order) => void;
 }) {
   const idx = stages.indexOf(o.status);
   return (
@@ -118,6 +120,11 @@ function TicketBody({
           All served.
         </div>
       )}
+      {cancel && (
+        <button className="cancel-link" onClick={() => cancel(o)}>
+          Cancel order
+        </button>
+      )}
       {idx > 0 && (
         <button className="undo" onClick={() => move(o.id, stages[idx - 1])}>
           <RotateCcw size={12} />
@@ -130,9 +137,11 @@ function TicketBody({
 function DragTicket({
   o,
   move,
+  cancel,
 }: {
   o: Order;
   move: (id: number, status: Status) => void;
+  cancel: (order: Order) => void;
 }) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, isDragging } =
     useDraggable({ id: o.id });
@@ -152,6 +161,7 @@ function DragTicket({
       <TicketBody
         o={o}
         move={move}
+        cancel={cancel}
         handle={
           <button
             ref={setActivatorNodeRef}
@@ -190,6 +200,13 @@ function BoardColumn({
 export default function StaffApp({ userId }: { userId: string }) {
   const workspace = useWorkspace(userId);
   const { menu, orders } = workspace;
+  const [cancelling, setCancelling] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const salesOrders = orders.filter((o) => o.status !== "Cancelled");
+  const requestCancel = (o: Order) => {
+    setCancelling(o);
+    setCancelReason("");
+  };
   const dragVersion = useRef<number | undefined>(undefined);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -309,7 +326,7 @@ export default function StaffApp({ userId }: { userId: string }) {
       `${i.name} ${i.description}`.toLowerCase().includes(search.toLowerCase()),
   );
   const units = basket.reduce((n, l) => n + l.qty, 0);
-  const active = orders.filter((o) => o.status !== "Collected").length;
+  const active = salesOrders.filter((o) => o.status !== "Collected").length;
   const exportSales = () => {
     const rows = [
       ["Order", "Status", "Payment", "Total INR"],
@@ -734,7 +751,11 @@ export default function StaffApp({ userId }: { userId: string }) {
                           }
                           aria-busy={workspace.saving.has(o.id)}
                         >
-                          <DragTicket o={o} move={move} />
+                          <DragTicket
+                            o={o}
+                            move={move}
+                            cancel={requestCancel}
+                          />
                         </div>
                       ))}
                     {!orders.some((o) => o.status === stage) && (
@@ -778,8 +799,10 @@ export default function StaffApp({ userId }: { userId: string }) {
           <div className="summary-strip">
             <div>
               <p>Total sales</p>
-              <h2>{money(orders.reduce((n, o) => n + total(o.lines), 0))}</h2>
-              <small>Payments recorded</small>
+              <h2>
+                {money(salesOrders.reduce((n, o) => n + total(o.lines), 0))}
+              </h2>
+              <small>Excludes cancelled orders</small>
             </div>
             <div>
               <p>Orders</p>
@@ -794,17 +817,30 @@ export default function StaffApp({ userId }: { userId: string }) {
                 <p>{p}</p>
                 <h2>
                   {money(
-                    orders
+                    salesOrders
                       .filter((o) => o.payment === p)
                       .reduce((n, o) => n + total(o.lines), 0),
                   )}
                 </h2>
                 <small>
-                  {orders.filter((o) => o.payment === p).length} orders
+                  {salesOrders.filter((o) => o.payment === p).length} orders
                 </small>
               </div>
             ))}
           </div>
+          {orders.some((o) => o.status === "Cancelled") && (
+            <p className="cancelled-summary">
+              {orders.filter((o) => o.status === "Cancelled").length} cancelled
+              ·{" "}
+              {money(
+                orders
+                  .filter((o) => o.status === "Cancelled")
+                  .reduce((n, o) => n + total(o.lines), 0),
+              )}{" "}
+              originally recorded as paid. Check any cash or UPI refunds
+              separately.
+            </p>
+          )}
           <h2 className="ledger-title">The order book</h2>
           <div className="table-wrap">
             <table>
@@ -815,11 +851,15 @@ export default function StaffApp({ userId }: { userId: string }) {
                   <th>Payment</th>
                   <th>Status</th>
                   <th>Total</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.map((o) => (
-                  <tr key={o.id}>
+                  <tr
+                    key={o.id}
+                    className={o.status === "Cancelled" ? "cancelled-row" : ""}
+                  >
                     <td>#{o.id}</td>
                     <td>
                       {o.lines
@@ -829,14 +869,107 @@ export default function StaffApp({ userId }: { userId: string }) {
                     <td>{o.payment}</td>
                     <td>
                       <span className="status-label">{o.status}</span>
+                      {o.status === "Cancelled" && (
+                        <small>{o.cancellationReason}</small>
+                      )}
                     </td>
                     <td>{money(total(o.lines))}</td>
+                    <td>
+                      {o.status === "Cancelled" ? (
+                        <button
+                          className="cancel-link"
+                          disabled={workspace.saving.has(o.id)}
+                          onClick={() => move(o.id, "Queued")}
+                        >
+                          Restore to queue
+                        </button>
+                      ) : (
+                        <button
+                          className="cancel-link"
+                          disabled={workspace.saving.has(o.id)}
+                          onClick={() => requestCancel(o)}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </main>
+      )}
+      {cancelling && (
+        <div className="modal-backdrop">
+          <section
+            className="customize cancel-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-title"
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !workspace.saving.has(cancelling.id))
+                setCancelling(null);
+              if (e.key === "Tab") {
+                const els = e.currentTarget.querySelectorAll<HTMLElement>(
+                  "input,button:not(:disabled)",
+                );
+                const first = els[0],
+                  last = els[els.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                  e.preventDefault();
+                  last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                  e.preventDefault();
+                  first.focus();
+                }
+              }
+            }}
+          >
+            <p className="eyebrow">ORDER #{cancelling.id}</p>
+            <h2 id="cancel-title">Cancel this order?</h2>
+            <p>
+              It will leave the board and stay in your order history. This does
+              not refund the {money(total(cancelling.lines))} payment.
+            </p>
+            <label>
+              Reason
+              <input
+                autoFocus
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                maxLength={200}
+                placeholder="Customer changed their mind…"
+              />
+            </label>
+            <div className="cancel-actions">
+              <button
+                className="secondary"
+                disabled={workspace.saving.has(cancelling.id)}
+                onClick={() => setCancelling(null)}
+              >
+                Keep order
+              </button>
+              <button
+                className="primary"
+                disabled={
+                  !cancelReason.trim() || workspace.saving.has(cancelling.id)
+                }
+                onClick={async () => {
+                  if (await workspace.cancel(cancelling, cancelReason)) {
+                    setToast(`Order #${cancelling.id} cancelled`);
+                    setCancelling(null);
+                  }
+                }}
+              >
+                {workspace.saving.has(cancelling.id)
+                  ? "Cancelling…"
+                  : "Cancel order"}
+              </button>
+            </div>
+            {workspace.error && <p role="alert">{workspace.error}</p>}
+          </section>
+        </div>
       )}
       {selected && (
         <div className="modal-backdrop" onClick={() => setSelected(null)}>

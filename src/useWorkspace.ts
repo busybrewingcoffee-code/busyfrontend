@@ -9,7 +9,8 @@ export type Line = {
   syrup: string;
   addonPrice?: number;
 };
-export type Status = "Queued" | "Preparing" | "Ready" | "Collected";
+export type Status =
+  "Queued" | "Preparing" | "Ready" | "Collected" | "Cancelled";
 export type Order = {
   id: number;
   version: number;
@@ -18,6 +19,7 @@ export type Order = {
   status: Status;
   created: number;
   note: string;
+  cancellationReason?: string;
 };
 type Pending = {
   id: string;
@@ -36,6 +38,7 @@ export function useWorkspace(userId: string) {
     }),
     [menu, setMenu] = useState<Item[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
+    [refreshError, setRefreshError] = useState(""),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [saving, setSaving] = useState<Set<number>>(new Set()),
@@ -66,7 +69,9 @@ export function useWorkspace(userId: string) {
         const page = (start: number, ceiling?: number) => {
           let q = db
             .from("orders")
-            .select("id,version,payment,status,created_at,note,order_items(*)")
+            .select(
+              "id,version,payment,status,created_at,note,cancellation_reason,order_items(*)",
+            )
             .order("id", { ascending: false })
             .range(start, start + 499);
           if (ceiling !== undefined) q = q.lte("id", ceiling);
@@ -116,6 +121,7 @@ export function useWorkspace(userId: string) {
         status: x.status,
         created: Date.parse(x.created_at),
         note: x.note,
+        cancellationReason: x.cancellation_reason,
         lines: x.order_items.map((l) => ({
           key: String(l.id),
           item: {
@@ -143,12 +149,13 @@ export function useWorkspace(userId: string) {
         ),
       );
       lastSync.current = Date.now();
+      setRefreshError("");
       setSynced(true);
       setLoading(false);
     } catch (e) {
       if (alive.current && n === epoch.current) {
         setSynced(false);
-        setError(message(e));
+        setRefreshError(message(e));
         setLoading(false);
       }
     } finally {
@@ -210,6 +217,46 @@ export function useWorkspace(userId: string) {
       return false;
     } finally {
       locks.current.delete(id);
+      setSaving(new Set(locks.current));
+      await refresh();
+    }
+  }
+  async function cancel(order: Order, reason: string) {
+    if (locks.current.has(order.id)) return false;
+    if (!navigator.onLine) {
+      setError("Reconnect before cancelling an order.");
+      return false;
+    }
+    epoch.current++;
+    locks.current.add(order.id);
+    setSaving(new Set(locks.current));
+    setError("");
+    try {
+      const { data, error } = await db.rpc("cancel_order", {
+        p_order_id: order.id,
+        p_expected_version: order.version,
+        p_reason: reason,
+        p_mutation_id: crypto.randomUUID(),
+      });
+      if (error) throw error;
+      setOrders((os) =>
+        os.map((o) =>
+          o.id === order.id
+            ? {
+                ...o,
+                status: data.status,
+                version: data.version,
+                cancellationReason: data.cancellation_reason,
+              }
+            : o,
+        ),
+      );
+      return true;
+    } catch (e) {
+      setError(message(e));
+      return false;
+    } finally {
+      locks.current.delete(order.id);
       setSaving(new Set(locks.current));
       await refresh();
     }
@@ -285,13 +332,14 @@ export function useWorkspace(userId: string) {
     addonPrices,
     menu,
     orders,
-    error,
+    error: error || refreshError,
     loading,
     saving,
     submitting,
     pending,
     move,
     checkout,
+    cancel,
     refresh,
     synced,
     lastSync: lastSync.current,

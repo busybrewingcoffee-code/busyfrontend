@@ -17,7 +17,7 @@ npm run build
 
 This branch continues the history of `busybrewingcoffee-code/busyfrontend`. The old app and untracked artwork remain untouched in the original BBC checkout. The integrated working directory is `Developer/busy-brewing-integrated`.
 
-Automatic Vercel Git deployments are disabled in `vercel.json`, including on `main`, until deployment is explicitly approved. No live deployment or project settings were changed. The currently served production deployment remains unchanged. Before a future approved release, configure the two public environment variables in Vercel, verify a preview, then explicitly deploy/promote and re-enable automatic deployments if desired. The committed output directory is `dist`; it supersedes the old `dist/public` layout. The `/staff` rewrite supports direct navigation. Unknown paths render a 404 message locally; the host handles other unmatched routes.
+Vercel automatically deploys `main`; feature-branch deployments remain disabled. The two public Supabase environment variables are configured in Vercel. Merge approved, tested changes through a PR. The committed output directory is `dist`; it supersedes the old `dist/public` layout. The `/staff` rewrite supports direct navigation. Unknown paths render a 404 message locally; the host handles other unmatched routes.
 
 ## Backend
 
@@ -53,4 +53,8 @@ No public sign-up is provided. Supabase's Auth signup endpoint may still be enab
 
 `tests/database.sql`: transaction-scoped fixtures, rolled back after verification. Covers menu count, authoritative totals, duplicate/reused submission IDs, atomic rollback, quantity/option validation, version conflicts, idempotent mutations, reverse moves, direct-write denial, and anonymous/unapproved access denial. Run via Supabase SQL tooling. Identity sequences may have harmless gaps after rollback.
 
-Manual checks: landing and logged-out staff route. A real signed-in device test is pending first-account password setup. Before event use, verify two devices moving the same ticket, network loss during checkout, reconnect, logout and CSV totals. Nothing has been deployed from this branch.
+Manual checks: public landing, login guard, signed-in checkout with Hot Matcha Latte and Fried Veg Momo, status-button move, desktop drag to Ready, cancellation, sales exclusion and restoration. Before event use, verify two devices moving the same ticket, network loss during checkout, reconnect, logout and CSV totals. Production release follows the approved PR merge.
+
+## Cancellation
+
+Cancel order appears among secondary ticket actions and in the order history. A confirmation requires a short reason. Cancelled orders leave the Kanban board, remain in history and CSV, and are excluded from displayed sales totals. The summary separately shows their originally recorded payments; refunds must be handled and reconciled outside this app. Restore to queue reverses an accidental cancellation. Cancellation checks the displayed order version and logs its actor and transition. No bulk deletion UI is exposed.

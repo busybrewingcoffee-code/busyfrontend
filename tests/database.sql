@@ -37,6 +37,14 @@ begin
  r:=public.move_order(oid,2,'Ready',gen_random_uuid());
  r:=public.move_order(oid,3,'Queued',gen_random_uuid());
  if r.version<>4 then raise exception 'Reverse drag failed'; end if;
+ mutation:=gen_random_uuid();
+ r:=public.cancel_order(oid,4,'Test cancellation',mutation);
+ if r.version<>5 or r.status<>'Cancelled' or r.cancellation_reason<>'Test cancellation' then raise exception 'Cancellation failed'; end if;
+ r:=public.cancel_order(oid,4,'Test cancellation',mutation);
+ if r.version<>5 then raise exception 'Cancellation retry applied twice'; end if;
+ begin perform public.cancel_order(oid,4,'Stale cancellation',gen_random_uuid());raise exception 'FAIL stale cancellation accepted';exception when serialization_failure then null;end;
+ r:=public.move_order(oid,5,'Queued',gen_random_uuid());
+ if r.version<>6 or r.status<>'Queued' then raise exception 'Restore failed'; end if;
  begin
   update public.orders set status='Collected' where id=oid;
   raise exception 'FAIL direct update accepted';

@@ -92,3 +92,59 @@
   opacity: 0.7;
   pointer-events: none;
 }
+
+.cancel-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  min-height: 44px;
+  font: inherit;
+  font-size: 12px;
+  border: 0;
+  background: transparent;
+  color: #8d6565;
+  cursor: pointer;
+}
+.ticket > .cancel-link {
+  float: right;
+}
+.cancel-link:hover {
+  color: #720d2c;
+  text-decoration: underline;
+}
+.cancel-dialog label {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0;
+}
+.cancel-dialog input {
+  font: inherit;
+  padding: 12px;
+  border: 1px solid #dacbbd;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.cancel-dialog > p {
+  line-height: 1.6;
+}
+.cancel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.cancelled-row {
+  color: #927c75;
+}
+.cancelled-row td > small {
+  display: block;
+  margin-top: 6px;
+  max-width: 220px;
+}
+.cancelled-summary {
+  padding: 16px;
+  background: #f0e6df;
+  border-radius: 8px;
+  line-height: 1.5;
+}

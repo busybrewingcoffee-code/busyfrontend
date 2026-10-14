@@ -135,3 +135,21 @@ it("unlocks a rejected order so its invalid details can be corrected", async () 
   expect(h.result.current.pending).toBe(null);
   expect(h.result.current.error).toContain("Nothing was saved");
 });
+it("cancellation uses the displayed version and preserves data on conflict", async () => {
+  mocks.rpc.mockResolvedValue({
+    data: null,
+    error: { code: "40001", message: "Order changed" },
+  });
+  const h = renderHook(() => useWorkspace("staff"));
+  await waitFor(() => expect(h.result.current.orders.length).toBe(1));
+  const snapshot = h.result.current.orders[0];
+  await act(async () => {
+    expect(
+      await h.result.current.cancel(snapshot, "Customer changed their mind"),
+    ).toBe(false);
+  });
+  expect(mocks.rpc.mock.calls[0][0]).toBe("cancel_order");
+  expect(mocks.rpc.mock.calls[0][1].p_expected_version).toBe(1);
+  expect(h.result.current.orders[0].status).toBe("Queued");
+  expect(h.result.current.saving.size).toBe(0);
+});
