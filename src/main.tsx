@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 const Landing = lazy(() => import("./Landing"));
 const Staff = lazy(() => import("./StaffGate"));
+const Hop = lazy(() => import("./hop/HopGate"));
 const path = window.location.pathname.replace(/\/+$/, "") || "/";
 createRoot(document.getElementById("root")!).render(
   <Suspense fallback={<p role="status">Loading Busy Brewing…</p>}>
@@ -9,6 +10,8 @@ createRoot(document.getElementById("root")!).render(
       <Landing />
     ) : path === "/staff" ? (
       <Staff />
+    ) : path === "/hop" ? (
+      <Hop />
     ) : (
       <main>
         <h1>Page not found</h1>

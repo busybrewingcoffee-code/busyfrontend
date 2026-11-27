@@ -58,3 +58,21 @@ Manual checks: public landing, login guard, signed-in checkout with Hot Matcha L
 ## Cancellation
 
 Cancel order appears among secondary ticket actions and in the order history. A confirmation requires a short reason. Cancelled orders leave the Kanban board, remain in history and CSV, and are excluded from displayed sales totals. The summary separately shows their originally recorded payments; refunds must be handled and reconciled outside this app. Restore to queue reverses an accidental cancellation. Cancellation checks the displayed order version and logs its actor and transition. No bulk deletion UI is exposed.
+
+## Horn OK Please (`/hop`)
+
+Second event, same backend. `menu_items.event` and `orders.event` separate events; every pre-HOP row is `pujo`, and `/staff` now reads only `pujo`. `/hop` reads only `hop`.
+
+- Menu: "The Season Between", 31 drinks + 7 add-ons (₹40 each, including espresso shot). Add-ons are their own lines, saved in tap order, so each sits under the drink it belongs to.
+- `create_event_order(p_event, …)`: same guarantees as `create_order` (staff only, server prices, idempotent request ID, all-or-nothing), checks items belong to the event, and assigns per-event `ticket_no` starting at 1. Moves/cancels reuse `move_order`/`cancel_order`.
+- Board: New (Queued) → Brewing (Preparing) → Done (Collected).
+- Sales: filter by day (midnight to midnight IST) or all days.
+
+Local preview against a mock copy of the database (never production):
+
+```sh
+node scripts/mock-api.mjs          # loads ~/BBC/Backups/*.json if present + all migrations
+npm run dev:mock                   # http://localhost:5190/hop, or the Mac's Wi-Fi IP from phones
+```
+
+`tests/hop-db.test.ts` applies the migration to the real backup and checks old totals are untouched.
