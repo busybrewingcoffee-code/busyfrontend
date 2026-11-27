@@ -11,6 +11,10 @@
     {
       "source": "/staff/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/hop/:path*",
+      "destination": "/index.html"
     }
   ]
 }

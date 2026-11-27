@@ -72,6 +72,7 @@ export function useWorkspace(userId: string) {
             .select(
               "id,version,payment,status,created_at,note,cancellation_reason,order_items(*)",
             )
+            .eq("event", "pujo")
             .order("id", { ascending: false })
             .range(start, start + 499);
           if (ceiling !== undefined) q = q.lte("id", ceiling);
@@ -92,6 +93,7 @@ export function useWorkspace(userId: string) {
         db
           .from("menu_items")
           .select("*")
+          .eq("event", "pujo")
           .eq("available", true)
           .order("sort_order"),
         loadOrders(),
