@@ -30,7 +30,7 @@ import {
   Smartphone,
   Snowflake,
   Coffee,
-  TrendingUp,
+  ChartNoAxesCombined,
   X,
 } from "lucide-react";
 import { supabase } from "../supabase";
@@ -47,6 +47,7 @@ import {
   type HopItem,
   type Temperature,
   uuid,
+  picks,
 } from "./menu";
 import { useHop, type Line, type Order, type Status } from "./useHop";
 import "./hop.css";
@@ -64,7 +65,7 @@ const stageOf = (o: Order): Status =>
   o.status === "Ready" ? "Collected" : (o.status as Status);
 const ago = (ms: number) => {
   const m = Math.max(0, Math.floor((Date.now() - ms) / 60000));
-  return m < 1 ? "just now" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} m`;
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`;
 };
 const read = <T,>(key: string, fallback: T): T => {
   try {
@@ -88,11 +89,10 @@ function LineList({ lines }: { lines: Line[] }) {
       {lines.map((l) => (
         <li key={l.key} className={isAddon(l.item) ? "is-addon" : ""}>
           <b>{l.qty}</b>
-          <span>
-            {isAddon(l.item) && <i aria-hidden="true">+</i>}
-            {l.item.name}
+          <div>
+            {isAddon(l.item) ? `+ ${l.item.name}` : l.item.name}
             {l.option && <small>{l.option}</small>}
-          </span>
+          </div>
         </li>
       ))}
     </ul>
@@ -102,11 +102,11 @@ function LineList({ lines }: { lines: Line[] }) {
 function TicketHead({ o }: { o: Order }) {
   return (
     <>
-      <span className="h-ticket-id">
-        <strong>#{o.no}</strong>
-        <small>{ago(o.created)}</small>
+      <strong>#{o.no}</strong>
+      <span className="h-ticket-meta">
+        <GripVertical size={16} aria-hidden="true" />
+        {ago(o.created)}
       </span>
-      <GripVertical className="h-grip" size={20} aria-hidden="true" />
     </>
   );
 }
@@ -134,32 +134,28 @@ function TicketBody({
       {o.note && <p className="h-ticket-note">{o.note}</p>}
       <div className="h-ticket-pay">
         <span>
-          {o.payment === "UPI" ? <Smartphone size={13} /> : <Banknote size={14} />}
-          {o.payment}
+          <Check size={13} />
+          Paid · {o.payment}
         </span>
         <strong>{money(o.total)}</strong>
       </div>
       {stage === "Queued" && (
         <button className="h-advance" onClick={() => move(o, "Preparing")}>
-          Start brewing <ArrowRight size={16} />
+          Start brewing <ArrowRight size={15} />
         </button>
       )}
       {stage === "Preparing" && (
-        <button className="h-advance done" onClick={() => move(o, "Collected")}>
-          Done <Check size={16} />
+        <button className="h-advance is-done" onClick={() => move(o, "Collected")}>
+          Mark done <Check size={15} />
         </button>
       )}
       <div className="h-ticket-links">
         {stage !== "Queued" && (
-          <button
-            onClick={() =>
-              move(o, stage === "Collected" ? "Preparing" : "Queued")
-            }
-          >
-            <RotateCcw size={12} /> Back
+          <button onClick={() => move(o, stage === "Collected" ? "Preparing" : "Queued")}>
+            <RotateCcw size={12} /> Move back
           </button>
         )}
-        {cancel && <button onClick={() => cancel(o)}>Cancel</button>}
+        {cancel && <button onClick={() => cancel(o)}>Cancel order</button>}
       </div>
     </>
   );
@@ -208,23 +204,15 @@ function DragTicket({
   );
 }
 
-function Column({
-  status,
-  children,
-}: {
-  status: Status;
-  children: React.ReactNode;
-}) {
+function Column({ status, children }: { status: Status; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <section
-      ref={setNodeRef}
-      className={`h-column h-col-${status} ${isOver ? "is-over" : ""}`}
-    >
+    <section ref={setNodeRef} className={`h-column h-col-${status} ${isOver ? "is-over" : ""}`}>
       {children}
     </section>
   );
 }
+
 
 export default function HopApp({ userId }: { userId: string }) {
   const hop = useHop(userId);
@@ -396,16 +384,24 @@ export default function HopApp({ userId }: { userId: string }) {
         .filter(([, v]) => v.addon)
         .sort((a, b) => b[1].qty - a[1].qty),
       cats: [...cats.entries()].sort((a, b) => b[1] - a[1]),
-      // Every hour from first to last sale, including quiet ones.
-      hours: hours.size
-        ? Array.from(
-            { length: Math.max(...hours.keys()) - Math.min(...hours.keys()) + 1 },
-            (_, i) => {
-              const h = Math.min(...hours.keys()) + i;
-              return [h, hours.get(h) ?? { orders: 0, sales: 0 }] as const;
-            },
-          )
-        : [],
+      // Every hour from first to last sale, including quiet ones. A night that
+      // runs past midnight reads 10p → 11p → 12a → 1a (start after the longest gap).
+      hours: (() => {
+        const hs = [...hours.keys()].sort((a, b) => a - b);
+        if (!hs.length) return [];
+        let start = hs[0],
+          gap = hs[0] + 24 - hs[hs.length - 1];
+        for (let i = 1; i < hs.length; i++)
+          if (hs[i] - hs[i - 1] > gap) {
+            gap = hs[i] - hs[i - 1];
+            start = hs[i];
+          }
+        const span = 24 - gap + 1;
+        return Array.from({ length: span }, (_, i) => {
+          const h = (start + i) % 24;
+          return [h, hours.get(h) ?? { orders: 0, sales: 0 }] as const;
+        });
+      })(),
     };
   }, [sold]);
   const cancelled = inDay.filter((o) => o.status === "Cancelled");
@@ -441,15 +437,22 @@ export default function HopApp({ userId }: { userId: string }) {
   const maxTop = Math.max(1, ...stats.top.map(([, v]) => v.qty));
   const status = hop.loading ? "Connecting" : hop.synced ? "Live" : "Offline";
 
+  const optionLabel = (i: HopItem) => {
+    const vs = variants(i);
+    if (vs.length) return vs.map((v) => v.replace(" Coke", "")).join(" / ");
+    return i.options.length === 1 ? `${i.options[0]} only` : "Hot / Iced";
+  };
+
   return (
     <div className="hop">
-      <div className="h-stripe" aria-hidden="true" />
       <header className="h-header">
-        <a className="h-brand" href="/hop" aria-label="Busy Brewing at Horn OK Please">
+        <a className="h-brand" href="/hop" aria-label="Busy Brewing">
           <Logo className="h-logo" />
           <span>
-            <strong>Busy Brewing</strong>
-            <em>The Season Between</em>
+            BUSY
+            <br />
+            BREWING
+            <small>THE STALL WORKSPACE</small>
           </span>
         </a>
         <nav className="h-nav" aria-label="Workspace">
@@ -457,7 +460,7 @@ export default function HopApp({ userId }: { userId: string }) {
             [
               ["Counter", LayoutGrid],
               ["Board", Columns3],
-              ["Sales", TrendingUp],
+              ["Sales", ChartNoAxesCombined],
             ] as const
           ).map(([name, Icon]) => (
             <button
@@ -466,17 +469,18 @@ export default function HopApp({ userId }: { userId: string }) {
               aria-current={tab === name ? "page" : undefined}
               onClick={() => setTab(name)}
             >
-              <Icon size={18} />
+              <Icon size={17} />
               <span>{name}</span>
-              {name === "Board" && openCount > 0 && <b>{openCount}</b>}
+              {name === "Board" && <b>{openCount}</b>}
             </button>
           ))}
         </nav>
         <div className="h-session">
-          <span className={`h-status is-${status.toLowerCase()}`}>
-            <i />
-            {status}
-          </span>
+          <div>
+            <span className={`h-dot is-${status.toLowerCase()}`} />
+            Horn OK Please
+            <small>{status === "Live" ? "The Season Between" : status}</small>
+          </div>
           <button
             className="h-icon-btn"
             aria-label="Sign out"
@@ -489,7 +493,7 @@ export default function HopApp({ userId }: { userId: string }) {
               void supabase!.auth.signOut();
             }}
           >
-            <LogOut size={18} />
+            <LogOut size={17} />
           </button>
         </div>
       </header>
@@ -504,7 +508,7 @@ export default function HopApp({ userId }: { userId: string }) {
         <div className="h-banner is-warn" role="status">
           <span>The last order needs confirming. It will never be saved twice.</span>
           <button disabled={hop.submitting} onClick={confirm}>
-            {hop.submitting ? "Checking…" : "Retry"}
+            {hop.submitting ? "Checking…" : "Retry confirmation"}
           </button>
         </div>
       )}
@@ -512,35 +516,41 @@ export default function HopApp({ userId }: { userId: string }) {
       {tab === "Counter" && (
         <main className={`h-counter ${hop.pending || hop.submitting ? "is-locked" : ""}`}>
           <section className="h-catalog">
-            <div className="h-controls">
-              <div className="h-cats" role="tablist" aria-label="Menu sections">
-                {categories.map((c) => (
-                  <button
-                    key={c}
-                    role="tab"
-                    aria-selected={c === category}
-                    className={c === category ? "is-on" : ""}
-                    onClick={() => setCategory(c)}
-                  >
-                    {c}
-                  </button>
-                ))}
+            <div className="h-catalog-scroll">
+              <div className="h-heading">
+                <div>
+                  <p className="h-eyebrow">THE SEASON BETWEEN</p>
+                  <h1>Something warm, something iced.</h1>
+                </div>
+                <span className="h-quiet">{drinks.length} drinks</span>
               </div>
-              <div className="h-tools">
-                <label className="h-search">
-                  <Search size={16} />
-                  <input
-                    aria-label="Search the menu"
-                    placeholder="Search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  {search && (
-                    <button aria-label="Clear search" onClick={() => setSearch("")}>
-                      <X size={14} />
+              <label className="h-search">
+                <Search size={17} />
+                <input
+                  aria-label="Search the menu"
+                  placeholder="Find a drink…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button aria-label="Clear search" onClick={() => setSearch("")}>
+                    <X size={15} />
+                  </button>
+                )}
+              </label>
+              <div className="h-controls">
+                <div className="h-cats" aria-label="Menu sections">
+                  {categories.map((c) => (
+                    <button
+                      key={c}
+                      aria-pressed={c === category}
+                      className={c === category ? "is-on" : ""}
+                      onClick={() => setCategory(c)}
+                    >
+                      {c}
                     </button>
-                  )}
-                </label>
+                  ))}
+                </div>
                 <div className="h-temp" role="group" aria-label="Hot or iced drinks">
                   <span className={`h-temp-thumb ${temp === "Iced" ? "is-iced" : ""}`} />
                   {(["Hot", "Iced"] as const).map((t) => (
@@ -556,67 +566,64 @@ export default function HopApp({ userId }: { userId: string }) {
                   ))}
                 </div>
               </div>
-            </div>
 
-            <div className="h-menu">
               {groups.map(([cat, items]) => (
                 <section key={cat} className="h-group">
-                  <h2>
-                    {cat}
-                    <span>{money(items[0].price)}</span>
-                  </h2>
+                  <div className="h-section-label">
+                    <h2>{cat}</h2>
+                    <span>
+                      {money(items[0].price)} · {plural(items.length, "drink")}
+                    </span>
+                  </div>
                   <div className="h-grid">
                     {items.map((i) => {
                       const vs = variants(i);
                       const count = inBasket(i.id);
                       const opt = optionFor(i, temp);
-                      return (
-                        <div
-                          key={i.id}
-                          className={`h-card ${bump === i.id ? "is-bump" : ""} ${vs.length ? "has-variants" : ""}`}
-                        >
+                      const tile = (
+                        <div className={`h-tile ${picks.has(i.id) ? "is-pick" : ""}`}>
+                          <HopArt kind={i.art} option={vs.length ? vs[0] : opt} />
+                          {picks.has(i.id) && <span className="h-pick">SEASON’S PICK</span>}
                           {count > 0 && <span className="h-count">{count}</span>}
+                          {!vs.length && (
+                            <span className="h-add">
+                              <Plus size={16} />
+                            </span>
+                          )}
+                        </div>
+                      );
+                      const copy = (
+                        <div className="h-copy">
+                          <h3>{i.name}</h3>
+                          <div>
+                            <strong>{money(i.price)}</strong>
+                            <span>{optionLabel(i)}</span>
+                          </div>
+                        </div>
+                      );
+                      return (
+                        <div key={i.id} className={`h-entry ${bump === i.id ? "is-bump" : ""}`}>
                           {vs.length ? (
                             <>
-                              <div className="h-card-art">
-                                <HopArt kind={i.art} option={vs[0]} />
-                              </div>
-                              <div className="h-card-copy">
-                                <h3>{i.name}</h3>
-                                <p>{i.description}</p>
-                              </div>
+                              {tile}
+                              {copy}
                               <div className="h-variants">
                                 {vs.map((v) => (
-                                  <button
-                                    key={v}
-                                    onClick={() => add(i, v)}
-                                    aria-label={`Add ${i.name}, ${v}`}
-                                  >
+                                  <button key={v} onClick={() => add(i, v)} aria-label={`Add ${i.name}, ${v}`}>
                                     {v.replace(" Coke", "")}
-                                    <Plus size={14} />
+                                    <Plus size={13} />
                                   </button>
                                 ))}
                               </div>
                             </>
                           ) : (
                             <button
-                              className="h-card-hit"
+                              className="h-item"
                               onClick={() => add(i, opt)}
                               aria-label={`Add ${opt} ${i.name}, ${money(i.price)}`}
                             >
-                              <div className="h-card-art">
-                                <HopArt kind={i.art} option={opt} />
-                                <span className="h-plus">
-                                  <Plus size={16} />
-                                </span>
-                              </div>
-                              <div className="h-card-copy">
-                                <h3>{i.name}</h3>
-                                <p>{i.description}</p>
-                              </div>
-                              {i.options.length === 1 && (
-                                <span className="h-only">{i.options[0]} only</span>
-                              )}
+                              {tile}
+                              {copy}
                             </button>
                           )}
                         </div>
@@ -627,11 +634,8 @@ export default function HopApp({ userId }: { userId: string }) {
               ))}
               {!groups.length && (
                 <div className="h-empty">
-                  <Snowflake size={26} />
-                  <p>
-                    Nothing {temp === "Hot" ? "hot" : "iced"} here
-                    {q ? ` for “${search}”` : ""}.
-                  </p>
+                  <h3>Nothing {temp === "Hot" ? "hot" : "iced"} here</h3>
+                  <p>{q ? `No drink matches “${search}”.` : "Try the other temperature or another section."}</p>
                   <button
                     onClick={() => {
                       setSearch("");
@@ -642,12 +646,15 @@ export default function HopApp({ userId }: { userId: string }) {
                   </button>
                 </div>
               )}
+              <footer className="h-footer">
+                Made for good coffee & a happy little rush.
+                <span>BUSY BREWING</span>
+              </footer>
             </div>
 
             <section className="h-addons" aria-label="Add-ons">
-              <p>
-                <strong>Add-ons ₹40</strong>
-                <span>Goes in the drink above it</span>
+              <p className="h-eyebrow">
+                ADD-ONS · ₹40 <span>goes in the drink above it</span>
               </p>
               <div>
                 {addons.map((a) => (
@@ -668,13 +675,18 @@ export default function HopApp({ userId }: { userId: string }) {
 
           <aside className={`h-basket ${sheet ? "is-open" : ""}`} aria-label="Current order">
             <div className="h-basket-head">
-              <h2>
-                Order <span>{units ? `${units} item${units > 1 ? "s" : ""}` : "empty"}</span>
-              </h2>
-              {basket.length > 0 && (
+              <div>
+                <p className="h-eyebrow">AT THE COUNTER</p>
+                <h2>
+                  New order <span>{units || "–"}</span>
+                </h2>
+              </div>
+              {basket.length > 0 ? (
                 <button className="h-clear" onClick={() => setBasket([])}>
                   Clear
                 </button>
+              ) : (
+                <ShoppingBag className="h-bag" size={22} />
               )}
               <button className="h-sheet-close" aria-label="Close order" onClick={() => setSheet(false)}>
                 <ChevronDown size={22} />
@@ -693,11 +705,11 @@ export default function HopApp({ userId }: { userId: string }) {
                     </div>
                     <div className="h-qty">
                       <button aria-label={`One less ${l.item.name}`} onClick={() => change(l.key, -1)}>
-                        <Minus size={14} />
+                        <Minus size={13} />
                       </button>
                       <span>{l.qty}</span>
                       <button aria-label={`One more ${l.item.name}`} onClick={() => change(l.key, 1)}>
-                        <Plus size={14} />
+                        <Plus size={13} />
                       </button>
                     </div>
                     <strong>{money(l.item.price * l.qty)}</strong>
@@ -706,47 +718,57 @@ export default function HopApp({ userId }: { userId: string }) {
               </ol>
             ) : (
               <div className="h-basket-empty">
-                <HopArt kind="cinnamon-latte" option="Iced" />
-                <p>Tap a drink to start.</p>
-                <small>Add-ons go right under the drink they belong to.</small>
+                <HopArt kind="cinnamon-latte" option="Hot" />
+                <h3>What are we brewing?</h3>
+                <p>
+                  Tap a drink to start an order.
+                  <br />
+                  Add-ons go right under it.
+                </p>
               </div>
             )}
             <div className="h-basket-foot">
-              <input
-                className="h-note"
-                value={note}
-                maxLength={200}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Note (less ice, name…)"
-                aria-label="Order note"
-              />
-              <div className="h-pay" role="radiogroup" aria-label="Payment">
+              <label className="h-note">
+                A little note <span>optional</span>
+                <input
+                  value={note}
+                  maxLength={200}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Less ice, a name…"
+                />
+              </label>
+              <div className="h-total">
+                <span>Total</span>
+                <strong>{money(basketTotal)}</strong>
+              </div>
+              <div className="h-pay" aria-label="Payment method">
                 {(["UPI", "Cash"] as const).map((p) => (
                   <button
                     key={p}
-                    role="radio"
-                    aria-checked={payment === p}
+                    aria-pressed={payment === p}
                     className={payment === p ? "is-on" : ""}
                     onClick={() => setPayment(p)}
                   >
                     {p === "UPI" ? <Smartphone size={17} /> : <Banknote size={18} />}
                     {p}
+                    {payment === p && <Check size={14} />}
                   </button>
                 ))}
               </div>
               <button
-                className="h-confirm"
+                className="h-primary h-checkout"
                 disabled={!basket.length || hop.submitting || hop.loading || !hop.synced}
                 onClick={confirm}
               >
-                <span>{hop.submitting ? "Saving…" : `${payment} received`}</span>
-                <strong>{money(basketTotal)}</strong>
+                <span>{hop.submitting ? "Saving order…" : `Confirm ${payment} received`}</span>
+                <ArrowRight size={18} />
               </button>
+              <p className="h-hint">Record payment after checking cash or UPI receipt</p>
             </div>
           </aside>
-          <button className="h-sheet-open" onClick={() => setSheet(true)}>
+          <button className="h-sheet-open h-primary" onClick={() => setSheet(true)}>
             <ShoppingBag size={18} />
-            Order · {units}
+            View order · {units}
             <strong>{money(basketTotal)}</strong>
           </button>
         </main>
@@ -754,6 +776,22 @@ export default function HopApp({ userId }: { userId: string }) {
 
       {tab === "Board" && (
         <main className="h-board-page">
+          <div className="h-heading">
+            <div>
+              <p className="h-eyebrow">ONE ORDER AT A TIME</p>
+              <h1>A little organised chaos.</h1>
+            </div>
+            <button className="h-primary" onClick={() => setTab("Counter")}>
+              <Plus size={17} /> New order
+            </button>
+          </div>
+          <div className="h-board-meta">
+            <span>
+              <span className="h-dot is-live" />
+              {plural(openCount, "order")} in the works
+            </span>
+            <span>Tap to update · drag the ticket header to move</span>
+          </div>
           <DndContext
             sensors={sensors}
             collisionDetection={(a) => (a.pointerCoordinates ? pointerWithin(a) : rectIntersection(a))}
@@ -772,8 +810,7 @@ export default function HopApp({ userId }: { userId: string }) {
             <div className={`h-board ${dragging !== null ? "is-dragging" : ""}`}>
               {columns.map((c) => {
                 const list = byStage(c.status);
-                const shown =
-                  c.status === "Collected" && !showAllDone ? list.slice(0, 12) : list;
+                const shown = c.status === "Collected" && !showAllDone ? list.slice(0, 12) : list;
                 return (
                   <Column key={c.status} status={c.status}>
                     <div className="h-column-head">
@@ -796,7 +833,12 @@ export default function HopApp({ userId }: { userId: string }) {
                           saving={hop.saving.has(o.id)}
                         />
                       ))}
-                      {!list.length && <p className="h-column-empty">{c.hint}</p>}
+                      {!list.length && (
+                        <div className="h-column-empty">
+                          <Coffee size={24} />
+                          <p>{c.hint}</p>
+                        </div>
+                      )}
                       {c.status === "Collected" && list.length > 12 && (
                         <button className="h-more" onClick={() => setShowAllDone((v) => !v)}>
                           {showAllDone ? "Show fewer" : `Show all ${list.length}`}
@@ -820,168 +862,157 @@ export default function HopApp({ userId }: { userId: string }) {
 
       {tab === "Sales" && (
         <main className="h-sales">
-          <div className="h-sales-top">
-            <div className="h-days" role="tablist" aria-label="Day">
-              {["All", ...days].map((d) => (
-                <button
-                  key={d}
-                  role="tab"
-                  aria-selected={activeDay === d}
-                  className={activeDay === d ? "is-on" : ""}
-                  onClick={() => setDay(d)}
-                >
-                  {d === "All" ? "All days" : d === today ? "Today" : dayLabel(d)}
-                </button>
-              ))}
+          <div className="h-heading">
+            <div>
+              <p className="h-eyebrow">THE EVENT, SO FAR</p>
+              <h1>Every little cup counts.</h1>
             </div>
-            <button className="h-ghost" onClick={exportCsv}>
-              <Download size={16} /> Export CSV
+            <button className="h-secondary" onClick={exportCsv}>
+              <Download size={16} /> Export sales
             </button>
           </div>
-          <p className="h-sales-note">
-            Days run midnight to midnight, India time. Cancelled orders are not counted.
-          </p>
-          <div className="h-kpis">
-            <div className="is-hero">
-              <p>Sales</p>
+          <div className="h-cats h-days" aria-label="Day">
+            {["All", ...days].map((d) => (
+              <button
+                key={d}
+                aria-pressed={activeDay === d}
+                className={activeDay === d ? "is-on" : ""}
+                onClick={() => setDay(d)}
+              >
+                {d === "All" ? "All days" : d === today ? "Today" : dayLabel(d)}
+              </button>
+            ))}
+          </div>
+          <div className="h-strip">
+            <div>
+              <p>Total sales</p>
               <h2>{money(stats.sales)}</h2>
-              <small>{plural(sold.length, "order")}</small>
+              <small>Excludes cancelled orders</small>
+            </div>
+            <div>
+              <p>Orders</p>
+              <h2>{sold.length}</h2>
+              <small>{money(sold.length ? Math.round(stats.sales / sold.length) : 0)} on average</small>
             </div>
             <div>
               <p>Drinks</p>
               <h2>{stats.drinkUnits}</h2>
               <small>
-                {stats.addonUnits} add-ons · {stats.hot} hot / {stats.iced} iced
+                {stats.hot} hot · {stats.iced} iced · {stats.addonUnits} add-ons
               </small>
             </div>
             <div>
-              <p>Average order</p>
-              <h2>{money(sold.length ? Math.round(stats.sales / sold.length) : 0)}</h2>
-              <small>
-                {sold.length ? (stats.drinkUnits / sold.length).toFixed(1) : "0"} drinks each
-              </small>
-            </div>
-            <div>
-              <p>UPI</p>
+              <p>UPI / Cash</p>
               <h2>{money(stats.upi.reduce((n, o) => n + o.total, 0))}</h2>
-              <small>{plural(stats.upi.length, "order")}</small>
-            </div>
-            <div>
-              <p>Cash</p>
-              <h2>{money(stats.cash.reduce((n, o) => n + o.total, 0))}</h2>
-              <small>{plural(stats.cash.length, "order")}</small>
+              <small>{money(stats.cash.reduce((n, o) => n + o.total, 0))} in cash</small>
             </div>
           </div>
           <div className="h-panels">
-            <section className="h-panel">
-              <h3>Bestsellers</h3>
+            <section>
+              <h2 className="h-ledger-title">Bestsellers</h2>
               {stats.top.length ? (
                 <ol className="h-bars">
                   {stats.top.map(([name, v]) => (
                     <li key={name}>
                       <span>{name}</span>
-                      <i style={{ width: `${(v.qty / maxTop) * 100}%` }} />
+                      <i>
+                        <i style={{ width: `${(v.qty / maxTop) * 100}%` }} />
+                      </i>
                       <b>{v.qty}</b>
                     </li>
                   ))}
                 </ol>
               ) : (
-                <p className="h-muted">No sales yet.</p>
+                <p className="h-quiet">No sales yet.</p>
               )}
               {stats.addonList.length > 0 && (
-                <p className="h-addon-tally">
-                  {stats.addonList.map(([n, v]) => `${n} ${v.qty}`).join(" · ")}
+                <p className="h-tally">
+                  Add-ons: {stats.addonList.map(([n, v]) => `${n} ${v.qty}`).join(" · ")}
                 </p>
               )}
             </section>
-            <section className="h-panel">
-              <h3>Orders by hour</h3>
+            <section>
+              <h2 className="h-ledger-title">Orders by hour</h2>
               {stats.hours.length ? (
                 <div className="h-hours">
                   {stats.hours.map(([h, v]) => (
                     <div key={h} title={`${v.orders} orders · ${money(v.sales)}`}>
-                      <b>{v.orders}</b>
+                      <b>{v.orders || ""}</b>
                       <i style={{ height: `${(v.orders / maxHour) * 100}%` }} />
-                      <span>{((h + 11) % 12) + 1}{h < 12 ? "a" : "p"}</span>
+                      <span>
+                        {((h + 11) % 12) + 1}
+                        {h < 12 ? "a" : "p"}
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="h-muted">No orders yet.</p>
+                <p className="h-quiet">No orders yet.</p>
               )}
               {stats.cats.length > 0 && (
-                <p className="h-addon-tally">
-                  {stats.cats.map(([c, n]) => `${c} ${n}`).join(" · ")}
-                </p>
+                <p className="h-tally">{stats.cats.map(([c, n]) => `${c} ${n}`).join(" · ")}</p>
               )}
             </section>
           </div>
-          <section className="h-panel">
-            <h3>
-              Order book <span>{inDay.length}</span>
-            </h3>
-            {cancelled.length > 0 && (
-              <p className="h-muted">
-                {cancelled.length} cancelled ({money(cancelled.reduce((n, o) => n + o.total, 0))}
-                ) — check refunds separately.
-              </p>
-            )}
-            <div className="h-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Time</th>
-                    <th>Items</th>
-                    <th>Pay</th>
-                    <th>Total</th>
-                    <th />
+          <h2 className="h-ledger-title">The order book</h2>
+          {cancelled.length > 0 && (
+            <p className="h-cancelled">
+              {cancelled.length} cancelled · {money(cancelled.reduce((n, o) => n + o.total, 0))} originally
+              recorded as paid. Check any cash or UPI refunds separately.
+            </p>
+          )}
+          <div className="h-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Time</th>
+                  <th>Items</th>
+                  <th>Payment</th>
+                  <th>Total</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inDay.map((o) => (
+                  <tr key={o.id} className={o.status === "Cancelled" ? "is-cancelled" : ""}>
+                    <td>#{o.no}</td>
+                    <td>
+                      {new Date(o.created).toLocaleTimeString("en-IN", {
+                        timeZone: "Asia/Kolkata",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td>
+                      {o.lines
+                        .map((l) => `${l.qty} × ${isAddon(l.item) ? "+ " : ""}${l.item.name}${l.option ? ` (${l.option})` : ""}`)
+                        .join(", ")}
+                      {o.status === "Cancelled" && <small>Cancelled · {o.cancellationReason}</small>}
+                    </td>
+                    <td>{o.payment}</td>
+                    <td>{money(o.total)}</td>
+                    <td>
+                      <button
+                        className="h-link"
+                        disabled={hop.saving.has(o.id)}
+                        onClick={() =>
+                          o.status === "Cancelled" ? void move(o, "Queued") : (setCancelling(o), setReason(""))
+                        }
+                      >
+                        {o.status === "Cancelled" ? "Restore to queue" : "Cancel"}
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {inDay.map((o) => (
-                    <tr key={o.id} className={o.status === "Cancelled" ? "is-cancelled" : ""}>
-                      <td>{o.no}</td>
-                      <td>
-                        {new Date(o.created).toLocaleTimeString("en-IN", {
-                          timeZone: "Asia/Kolkata",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                      <td>
-                        {o.lines.map((l) => `${l.qty}× ${l.item.name}${l.option ? ` (${l.option})` : ""}`).join(", ")}
-                        {o.status === "Cancelled" && <small>Cancelled: {o.cancellationReason}</small>}
-                      </td>
-                      <td>{o.payment}</td>
-                      <td>{money(o.total)}</td>
-                      <td>
-                        <button
-                          className="h-link"
-                          disabled={hop.saving.has(o.id)}
-                          onClick={() =>
-                            o.status === "Cancelled"
-                              ? void move(o, "Queued")
-                              : (setCancelling(o), setReason(""))
-                          }
-                        >
-                          {o.status === "Cancelled" ? "Restore" : "Cancel"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </main>
       )}
 
       {cancelling && (
-        <div
-          className="h-modal"
-          onClick={() => !hop.saving.has(cancelling.id) && setCancelling(null)}
-        >
+        <div className="h-modal" onClick={() => !hop.saving.has(cancelling.id) && setCancelling(null)}>
           <section
             role="dialog"
             aria-modal="true"
@@ -989,10 +1020,11 @@ export default function HopApp({ userId }: { userId: string }) {
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.key === "Escape" && setCancelling(null)}
           >
-            <h2 id="h-cancel-title">Cancel order #{cancelling.no}?</h2>
+            <p className="h-eyebrow">ORDER #{cancelling.no}</p>
+            <h2 id="h-cancel-title">Cancel this order?</h2>
             <p>
-              It leaves the board but stays in the order book. The {money(cancelling.total)}{" "}
-              payment is not refunded by the app.
+              It will leave the board and stay in your order book. This does not refund the{" "}
+              {money(cancelling.total)} payment.
             </p>
             <div className="h-reasons">
               {["Wrong entry", "Customer left", "Duplicate", "Test"].map((r) => (
@@ -1001,26 +1033,28 @@ export default function HopApp({ userId }: { userId: string }) {
                 </button>
               ))}
             </div>
-            <input
-              autoFocus
-              value={reason}
-              maxLength={200}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Or type a reason"
-              aria-label="Cancellation reason"
-            />
+            <label>
+              Reason
+              <input
+                autoFocus
+                value={reason}
+                maxLength={200}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Customer changed their mind…"
+              />
+            </label>
             <div className="h-modal-actions">
-              <button className="h-ghost" onClick={() => setCancelling(null)}>
-                Keep it
+              <button className="h-secondary" onClick={() => setCancelling(null)}>
+                Keep order
               </button>
               <button
-                className="h-danger"
+                className="h-primary"
                 disabled={!reason.trim() || hop.saving.has(cancelling.id)}
                 onClick={async () => {
                   const o = cancelling;
                   if (await hop.cancel(o, reason.trim())) {
                     setCancelling(null);
-                    setToast(`#${o.no} cancelled`);
+                    setToast(`Order #${o.no} cancelled`);
                   }
                 }}
               >
@@ -1032,7 +1066,7 @@ export default function HopApp({ userId }: { userId: string }) {
       )}
 
       {toast && (
-        <div className="h-toast" role="status">
+        <div className={`h-toast ${tab === "Counter" ? "is-raised" : ""}`} role="status">
           <Check size={16} />
           {toast}
         </div>

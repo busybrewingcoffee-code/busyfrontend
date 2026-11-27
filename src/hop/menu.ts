@@ -58,3 +58,6 @@ export const uuid = (): string => {
   const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 };
+
+// The three drinks the printed menu marks as "Our specials for The Season Between".
+export const picks = new Set([120, 141, 151]);

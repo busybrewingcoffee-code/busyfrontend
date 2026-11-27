@@ -91,16 +91,20 @@ export default function HopGate() {
   if (user && allowed) return <HopApp userId={user} />;
   return (
     <main className="hop h-auth">
-      <div className="h-stripe" aria-hidden="true" />
       <section className="h-auth-card">
         <Logo full className="h-logo-full" />
-        <em>The Season Between</em>
-        <p>Horn OK Please · staff counter</p>
+        <p className="h-eyebrow">HORN OK PLEASE · THE SEASON BETWEEN</p>
+        <h1>
+          A little busy.
+          <br />
+          Welcome back.
+        </h1>
+        <p>Sign in to open the counter.</p>
         {!supabase ? (
           <p role="alert">Workspace connection is not configured yet.</p>
         ) : user ? (
-          <button className="h-confirm" onClick={() => supabase!.auth.signOut()}>
-            <span>Sign out</span>
+          <button className="h-primary" onClick={() => supabase!.auth.signOut()}>
+            Sign out
           </button>
         ) : (
           <form onSubmit={login}>
@@ -112,8 +116,8 @@ export default function HopGate() {
               Password
               <input name="password" type="password" autoComplete="current-password" required />
             </label>
-            <button className="h-confirm" disabled={busy}>
-              <span>{busy ? "Signing in…" : "Open the counter"}</span>
+            <button className="h-primary" disabled={busy}>
+              {busy ? "Signing in…" : "Open the counter"}
             </button>
           </form>
         )}
